@@ -33,7 +33,7 @@ class MyTest(unittest.TestCase):
 
         self.assertEqual(len(taskWithoutDate), 1)
         self.assertEqual(len(taskWithDate), 3)
-        self.assertTask(taskWithoutDate, "Test1", "PENDING", None, None)
+        self.assertTask(taskWithoutDate, "Test1", "PENDING", None, None, ignoreDates=True)
         self.assertTask(taskWithDate, "Test3", "PENDING",
                         datetime.datetime.strptime('2014-05-14 15:30', '%Y-%m-%d %H:%M'), 'DAILY')
         self.assertTask(taskWithDate, "Test4", "PENDING",
@@ -48,8 +48,8 @@ class MyTest(unittest.TestCase):
 
         self.assertEqual(len(taskWithoutDate), 2)
         self.assertEqual(len(taskWithDate), 3)
-        self.assertTask(taskWithoutDate, "Test1", "PENDING", None, None)
-        self.assertTask(taskWithoutDate, "Test2", "DONE", None, None)
+        self.assertTask(taskWithoutDate, "Test1", "PENDING", None, None, ignoreDates=True)
+        self.assertTask(taskWithoutDate, "Test2", "DONE", None, None, ignoreDates=True)
         self.assertTask(taskWithDate, "Test3", "PENDING",
                         datetime.datetime.strptime('2014-05-14 15:30', '%Y-%m-%d %H:%M'),
                         'DAILY')
@@ -85,8 +85,55 @@ class MyTest(unittest.TestCase):
         yestedayTime = yesterday_5_min_future.time()
         print(datetime.datetime.combine(today, yestedayTime) - datetime.datetime.combine(today, todayTime) )
         print(datetime.datetime.combine(today, todayTime) - datetime.datetime.combine(today, yestedayTime) )
-        # allEntries = self.index.listNotificationsPendingTasks()
-        # self.assertEqual(len(allEntries), 2)
+
+    def testAgenda(self):
+        today = datetime.datetime.today()
+        yesterday = today + datetime.timedelta(days=-1) + datetime.timedelta(minutes=5)
+        twodays_ago = today + datetime.timedelta(days=-2) + datetime.timedelta(minutes=10)
+        tomorrow = today + datetime.timedelta(days=1) + datetime.timedelta(minutes=20)
+        lastWeekSameDay = today + datetime.timedelta(days=-7) + datetime.timedelta(minutes=20)
+        lastWeekNotSameDay = today + datetime.timedelta(days=-8) + datetime.timedelta(minutes=20)
+        lastWeekTwoDaysFromNow = today + datetime.timedelta(days=-5) + datetime.timedelta(minutes=20)
+        lastWeekFourDaysFromNow = today + datetime.timedelta(days=-11)+ datetime.timedelta(minutes=20)
+
+        todayDailyRecTask = self.createTask(111, today.strftime('%Y-%m-%d %H:%M'), "t1", "1", "DAILY", 0, "PENDING")
+        yesterdayDailyRecTask = self.createTask(112, yesterday.strftime('%Y-%m-%d %H:%M'), "t2", "1", "DAILY", 0,
+                                                "PENDING")
+        tomorrowDailyRecTask = self.createTask(113, tomorrow.strftime('%Y-%m-%d %H:%M'), "t3", "1", "DAILY", 0,
+                                               "PENDING")
+        lastWeekNotRecTask1 = self.createTask(113, lastWeekSameDay.strftime('%Y-%m-%d %H:%M'), "t4", "1", "WEEKLY", 0,
+                                              "PENDING")
+        lastWeekNotRecTask2 = self.createTask(113, lastWeekNotSameDay.strftime('%Y-%m-%d %H:%M'), "t5", "1", "WEEKLY",
+                                              0, "PENDING")
+        lastWeekNotRecTask3 = self.createTask(113, lastWeekTwoDaysFromNow.strftime('%Y-%m-%d %H:%M'), "t6", "1",
+                                              "WEEKLY", 0, "PENDING")
+        lastWeekTask4= self.createTask(113, lastWeekFourDaysFromNow.strftime('%Y-%m-%d %H:%M'), "t7", "1",
+                                              "WEEKLY", 0, "PENDING")
+
+        taskList = [todayDailyRecTask.toString(), yesterdayDailyRecTask.toString(), todayDailyRecTask.toString(),
+                    lastWeekNotRecTask1.toString(), lastWeekNotRecTask2.toString(), tomorrowDailyRecTask.toString(),
+                    lastWeekNotRecTask3.toString()
+            # ,lastWeekTask4.toString()
+        ]
+        self.__create__initial_tasks__(taskList)
+
+        self.index = Index()
+        todayTasks, upComing = self.index.agenda()
+        self.assertEqual(len(todayTasks), 5)
+        self.assertTask(todayTasks, "t1", "PENDING", today, rec="DAILY")
+        self.assertTask(todayTasks, "Today task1", "PENDING", today.date(), rec="NONE", roundDates=True)
+        self.assertTask(todayTasks, "t2", "PENDING", today.date(), rec="DAILY", roundDates=True)
+        self.assertTask(todayTasks, "t4", "PENDING", today.date(), rec="WEEKLY", roundDates=True)
+        self.assertTask(todayTasks, "Test3", "PENDING", today.date(), rec="DAILY", roundDates=True)
+
+        self.assertEqual(len(upComing), 6)
+        self.assertTask(upComing, "t1", "PENDING", rec="DAILY", ignoreDates=True)
+        self.assertTask(upComing, "t2", "PENDING", rec="DAILY", ignoreDates=True)
+        self.assertTask(upComing, "Test3", "PENDING", rec="DAILY", ignoreDates=True)
+        self.assertTask(upComing, "t3", "PENDING", rec="DAILY", ignoreDates=True)
+        self.assertTask(upComing, "t4", "PENDING", rec="WEEKLY", ignoreDates=True)
+        self.assertTask(upComing, "t6", "PENDING", rec="WEEKLY", ignoreDates=True)
+
 
     def testNormalize(self):
         today = datetime.datetime.today()
@@ -125,8 +172,6 @@ class MyTest(unittest.TestCase):
         today = datetime.datetime.today()
         yesterday_10_min_future = today + datetime.timedelta(minutes=10) + datetime.timedelta(days=-1)
         day_before_yesterday_10_min_past = today + datetime.timedelta(minutes=-10) + datetime.timedelta(days=-1)
-        # last_week_10_min_future = today + datetime.timedelta(minutes=10) + datetime.timedelta(days=-7)
-        # last_week_10_min_past = today + datetime.timedelta(minutes=-10) + datetime.timedelta(days=-7)
         self.addTask(6, "yesterday overdue", "PENDING", day_before_yesterday_10_min_past.strftime('%Y-%m-%d %H:%M'),
                      "DAILY", "NOTIFY")
         self.addTask(7, "yesterday overdue no rec", "PENDING",
@@ -225,7 +270,7 @@ class MyTest(unittest.TestCase):
         self.index.addTask("new task", None, None, None)
         taskWithDate, taskWithoutDate = Index().listAll()
         self.assertEqual(len(taskWithoutDate), 2)
-        self.assertTask(taskWithoutDate, "new task", "PENDING", None, None, True)
+        self.assertTask(taskWithoutDate, "new task", "PENDING", None, None, ignoreDates=True)
 
 
     def test_mark_task_done(self):
@@ -252,15 +297,18 @@ class MyTest(unittest.TestCase):
         self.assertEqual(deletedTask, None)
 
 
-    def assertTask(self, taskList, name, status, date=None, rec=None, roundDates=False):
+    def assertTask(self, taskList, name, status, date=None, rec=None, roundDates=False, ignoreDates=False):
         match = False
         for task in taskList:
             if (task.taskName == name and task.status == status and task.reccrance == rec ):
-                if (roundDates == True and task.date != None and task.date.date() == date):
+                if (ignoreDates):
+                    match = True
+                    break
+                elif (roundDates == True and task.date != None and task.date.date() == date):
                     match = True
                     break
                 else:
-                    if task.date == date:
+                    if hasattr(date, "second") and task.date == date.replace(second=0, microsecond=0):
                         match = True
                         break
         self.assertTrue(match == True, "Unable to find a task with given values")
@@ -275,6 +323,12 @@ class MyTest(unittest.TestCase):
         self.index.entries.append(
             self.createTask(id, datetime, name, notify, rec, snoozed, status))
 
+    def __create__initial_tasks__(self, tasks):
+        i = 1000
+        for task in tasks:
+            self.__create_initial_task__(task, str(i))
+            i += 1
+
     def __create_initial_task__(self, task, id):
         taskId = hashlib.sha1()
         taskId.update(task)
@@ -286,3 +340,6 @@ class MyTest(unittest.TestCase):
         keyFile.write(id)
         keyFile.flush()
         keyFile.close()
+
+
+

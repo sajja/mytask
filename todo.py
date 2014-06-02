@@ -3,13 +3,14 @@ from datetime import datetime
 from datetime import timedelta
 from time import sleep
 from print_plugin import TextDecoratorPlugin, PaddedDecoratorPlugin, ConkyColoredDecoratorPlugin, HumanizedDatesPlugin
+import pynotify
 
 __author__ = 'sajith'
 
 import sys
 from subprocess import call
 
-index = Index()
+index = Index("./.task")
 
 
 class Todo:
@@ -47,7 +48,7 @@ class Todo:
             raise Exception("Too many params")
 
         #todo do this better
-        name = params[0]
+        name = params[0].replace("\"","")
         params = params[1:]
         if (len(params) > 0 ):
             date = self.parseDate(params[0])
@@ -124,17 +125,24 @@ class Todo:
 
     def notifyAll(self):
         tasksTobeNotified = index.listNotificationsPendingTasks(15)
-
+        print("Entering into notification loop...")
         for overdueTask in tasksTobeNotified[0]:
-            text = "Task: " + overdueTask.taskName + " " + self.getOverdueTime(overdueTask.dueIn, True)
-            call("/usr/bin/notify-send \"" + text + "\"", shell=True)
+            pynotify.init("markup")
+            n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
+                                      "<b>Task Name</b> <i>" + overdueTask.taskName + "</i> <b>" + self.getDueTime(
+                                          overdueTask.dueIn, True) + "</b>",
+                                      "/home/sajith/scratch/mytodo/Task-List-icon.png")
+            n.show()
             sleep(2)
-            # call("notify-send", overdueTask.taskName + "is overdue")
 
         for starting in tasksTobeNotified[1]:
-            text = "Task: " + starting.taskName + " " + self.getOverdueTime(starting.dueIn, False)
-            call("/usr/bin/notify-send \"" + text + "\"", shell=True)
-            # sleep(2)
+            pynotify.init("markup")
+            n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
+                                      "<b>Task Name</b> <i>" + starting.taskName + "</i> <b>" + self.getDueTime(
+                                          starting.dueIn, False) + "</b>",
+                                      "/home/sajith/scratch/mytodo/Task-List-icon.png")
+            n.show()
+            sleep(2)
 
 
     def listAll(self):
@@ -149,7 +157,7 @@ class Todo:
             count += 1
         print("Total number of entries " + str(count))
 
-    def getOverdueTime(self, time, isOverdue):
+    def getDueTime(self, time, isOverdue):
         if (time == 0 and isOverdue):
             return "just passed the scheduled time"
         elif (time == 0 and not isOverdue):
@@ -162,19 +170,28 @@ class Todo:
     def listTodos(self):
         taskWithDates, taskWithoutDates = index.listAll()
         textDeco = self.__getTextDecorator__("conky")
-        print("${color 00FF00}")
-        print("Task Id       Task Name")
-        print("-------       --------- ${color}")
-        for task in taskWithoutDates:
-            print(textDeco.getTaskId(task.id) + textDeco.getTaskName(task.taskName))
+        if (len(taskWithoutDates) > 0):
+            print("${color A8A8A8}")
+            # print("Task Id       Task Name")
+            # print("-------       --------- ${color}")
+            for task in taskWithoutDates:
+                print("("+textDeco.getTaskId(task.id)+")" + textDeco.getTaskName(task.taskName))
+        else:
+            print("You got nothing todo")
+            print("    Perhaps you should find some work to do")
 
     def agenda(self):
-        taskWithDates, taskWithoutDates = index.listAll()
+        today, upcoming = index.agenda()
         textDeco = self.__getTextDecorator__("conky")
-        print("${color 00FF00}")
-        print("Task Id       Task Name                               Due on")
-        print("-------       ---------                               --------------- ${color}")
-        for task in taskWithDates:
+        print("${color A8A8A8}")
+        for task in today:
+            taskTime = ""
+            if (hasattr(task.date, "time") and (task.date.time().hour != 0 or task.date.time().minute != 0)):
+                taskTime = "(" + str(task.date.time().hour) + ":" + str(task.date.time().minute) + ")"
+            print(
+                "${color D6EBFF}(" + str(task.id) + ") " + task.taskName + "            TODAY" + taskTime + " ${color}")
+        print("")
+        for task in upcoming:
             print(textDeco.getTaskId(task.id) + textDeco.getTaskName(task.taskName) + textDeco.getDueDate(task.date))
 
     def __getTextDecorator__(self, pluginType):
@@ -186,6 +203,8 @@ class Todo:
 
 
 def main():
+    # for arg in sys.argv:
+    #     print(arg)
     if len(sys.argv) <= 1:
         print("Usage: todo <listall>")
         exit()

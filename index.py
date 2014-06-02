@@ -1,3 +1,6 @@
+import copy
+from dateutil import get_floor_time, get_time_as_str, countDays
+
 __author__ = 'sajith'
 
 import datetime
@@ -82,11 +85,21 @@ class Index:
         return (overdueTasks, startingSoonTasks)
 
     def normalizeIfReccrentTask(self, task, now):
+        # if task.reccrance != None and task.date < now and self.isItToday(task.date, now, task.reccrance) == True:
         if task.reccrance != None and task.date < now and self.isItToday(task.date, now, task.reccrance) == True:
             taskTime = task.date.time()
             return datetime.datetime.combine(now, taskTime)
         else:
             return task.date
+
+
+    # def normalizeIfReccrentTask(self, task, now):
+        # if task.reccrance != None and task.date < now:
+        #     daysDiff = now.weekday() - task.date.weekday()
+        #     taskTime = task.date.time()
+        #     return datetime.datetime.combine(now + datetime.timedelta(days=daysDiff), taskTime)
+        # else:
+        #     return task.date
 
     def isItToday(self, taskDate, today, rec):
         if rec == "DAILY":
@@ -99,7 +112,7 @@ class Index:
         elif rec == "NONE":
             return False
         else:
-            raise Exception("Unsupported reccurence")
+            raise Exception("Unsupported reccurence" + rec)
 
 
     def __shoudl_notify__(self, task):
@@ -175,6 +188,41 @@ class Index:
     def __update_task__(self, task):
         self.__write_to_fs__(task, task.internalId)
 
+    def agenda(self):
+        now = datetime.datetime.now()
+        taskWithDate, taskWithoutDate = self.listAll()
+        todaysAgenda = []
+        upcoming = []
+        for task in taskWithDate:
+            # date = self.normalizeIfReccrentTask(task, now)
+            daysBetweenTasks = countDays(now.weekday(),task.date.weekday())
+            if (get_floor_time(task.date) == get_floor_time(now)):
+                shallowCopyiedTask = copy.copy(task)
+                shallowCopyiedTask.date = task.date
+                todaysAgenda.append(shallowCopyiedTask)
+                if(task.reccrance == "DAILY"):
+                    shallowCopyiedTask = copy.copy(task)
+                    shallowCopyiedTask.date=now + datetime.timedelta(days=1)
+                    upcoming.append(shallowCopyiedTask)
+
+            elif (task.reccrance == "DAILY" and task.date < now) or (daysBetweenTasks == 0 and task.reccrance == "WEEKLY" and task.date < now):
+                    shallowCopyiedTask = copy.copy(task)
+                    shallowCopyiedTask.date=now
+                    todaysAgenda.append(shallowCopyiedTask)
+                    shallowCopyiedTask1 = copy.copy(task)
+                    shallowCopyiedTask1.date = now + datetime.timedelta(days=1)
+                    upcoming.append(shallowCopyiedTask1)
+            elif (daysBetweenTasks < 3 and task.date.weekday() > now.weekday()):
+                    shallowCopyiedTask = copy.copy(task)
+                    shallowCopyiedTask.date = now + datetime.timedelta(days=daysBetweenTasks)
+                    upcoming.append(shallowCopyiedTask)
+
+            # elif (get_floor_time(date) > get_floor_time(now) and get_floor_time(date) < get_floor_time(date + datetime.timedelta(days=3))):
+            #     task.date = date
+            #     upcoming.append(task)
+
+
+        return todaysAgenda, upcoming
 
 class Task:
     taskName = ""

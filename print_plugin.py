@@ -1,5 +1,5 @@
 import datetime
-from index import Task
+from dateutil import get_floor_time, get_time_as_str
 
 __author__ = 'sajith'
 
@@ -85,28 +85,29 @@ class HumanizedDatesPlugin(TextDecoratorPlugin):
 
     def __get_humanized_date__(self, date):
         now = datetime.datetime.now()
-        if (self.get_floor_time(date) == self.get_floor_time(now)):
-            return "Today" + self.get_time_as_str(date)
-        elif (self.get_floor_time(date) == self.get_floor_time((now + datetime.timedelta(days=1)))):
-            return "Tomorrow" + self.get_time_as_str(date)
-        elif (self.get_floor_time(date) == self.get_floor_time(now + datetime.timedelta(days=2))):
+        if (get_floor_time(date) == get_floor_time(now)):
+            return "Today" + get_time_as_str(date)
+        elif (get_floor_time(date) == get_floor_time((now + datetime.timedelta(days=1)))):
+            return "Tomorrow" + get_time_as_str(date)
+        elif (get_floor_time(date) == get_floor_time(now + datetime.timedelta(days=2))):
             return "Day after tomorrow"
-        elif (self.get_floor_time(date) < self.get_floor_time(now)):
-            return "Ovedue by " + str((now - self.get_floor_time(date)).days) + " Days"
+        elif (get_floor_time(date) < get_floor_time(now)):
+            return "Ovedue by " + str((now - get_floor_time(date)).days) + " Days"
         else:
             return "Later (" + str(date.day) + "/" + str(date.month) + ")"
 
-    def get_floor_time(self, date):
-        if (hasattr(date,"time")):
-            return date.replace(hour=0,minute=0,second=0,microsecond=0)
-        else:
-            return datetime.datetime.combine(date,datetime.time(0,0,0,0))
+            # def get_floor_time(self, date):
+            #     if (hasattr(date,"time")):
+            #         return date.replace(hour=0,minute=0,second=0,microsecond=0)
+            #     else:
+            #         return datetime.datetime.combine(date,datetime.time(0,0,0,0))
+            #
+            # def get_time_as_str(self,date):
+            #     if (hasattr(date,"time")):
+            #         return " - " +str(date.time().hour) + ":" + str(date.time().minute)
+            #     else:
+            #         return ""
 
-    def get_time_as_str(self,date):
-        if (hasattr(date,"time")):
-            return " - " +str(date.time().hour) + ":" + str(date.time().minute)
-        else:
-            return ""
 
 def main():
     today = datetime.datetime.now()
