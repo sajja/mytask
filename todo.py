@@ -10,7 +10,7 @@ __author__ = 'sajith'
 import sys
 from subprocess import call
 
-index = Index("./.task")
+index = Index("/home/sajith/.task")
 
 
 class Todo:
@@ -183,16 +183,17 @@ class Todo:
     def agenda(self):
         today, upcoming = index.agenda()
         textDeco = self.__getTextDecorator__("conky")
-        print("${color A8A8A8}")
+
         for task in today:
             taskTime = ""
             if (hasattr(task.date, "time") and (task.date.time().hour != 0 or task.date.time().minute != 0)):
                 taskTime = "(" + str(task.date.time().hour) + ":" + str(task.date.time().minute) + ")"
-            print(
-                "${color D6EBFF}(" + str(task.id) + ") " + task.taskName + "            TODAY" + taskTime + " ${color}")
+            print(textDeco.getTodayTaskName(task.taskName) + taskTime)
+            # print(
+            #     "${color D6EBFF}(" + str(task.id) + ") " + task.taskName + "            TODAY" + taskTime + " ${color}")
         print("")
-        for task in upcoming:
-            print(textDeco.getTaskId(task.id) + textDeco.getTaskName(task.taskName) + textDeco.getDueDate(task.date))
+        # for task in upcoming:
+        #     print(textDeco.getTaskId(task.id) + textDeco.getTaskName(task.taskName) + textDeco.getDueDate(task.date))
 
     def __getTextDecorator__(self, pluginType):
         if (pluginType == None):

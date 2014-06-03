@@ -19,6 +19,15 @@ class TextDecoratorPlugin:
     def getTaskName(self, task):
         return task
 
+    def getTodayTaskName(self, task):
+        return task
+
+    def getTomorrowTaskName(self, task):
+        return task
+
+    def getLaterTaskName(self, task):
+        return task
+
     def getDueDate(self, task):
         return task
 
@@ -71,6 +80,10 @@ class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
 
 
 class HumanizedDatesPlugin(TextDecoratorPlugin):
+    todayTasks="${color D6EBFF}${task}${color}"
+    tomorrowTasks="${color A8A8A8}${task}${color}"
+    laterTasks="${color A8A8A8}${task}${color}"
+
     def __init__(self, decorator):
         self.decorator = decorator
 
@@ -79,6 +92,15 @@ class HumanizedDatesPlugin(TextDecoratorPlugin):
 
     def getTaskName(self, task):
         return self.decorator.getTaskName(task)
+
+    def getTodayTaskName(self, task):
+        return self.decorator.getTaskName(self.todayTasks.replace("${task}",task))
+
+    def getTomorrowTaskName(self, task):
+        return self.decorator.getTaskName(self.tomorrowTasks.replace("${task}",task))
+
+    def getLaterTaskName(self, task):
+        return self.decorator.getTaskName(self.laterTasks.replace("${task}",task))
 
     def getTaskId(self, task):
         return self.decorator.getTaskId(task)
