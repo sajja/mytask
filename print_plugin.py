@@ -16,23 +16,14 @@ class PrintPlugin:
 
 
 class TextDecoratorPlugin:
-    def getTaskName(self, task):
-        return task
+    def getTaskName(self, taskName, task):
+        return taskName
 
-    def getTodayTaskName(self, task):
-        return task
+    def getDueDate(self, taskName, task):
+        return taskName
 
-    def getTomorrowTaskName(self, task):
-        return task
-
-    def getLaterTaskName(self, task):
-        return task
-
-    def getDueDate(self, task):
-        return task
-
-    def getTaskId(self, task):
-        return task
+    def getTaskId(self, taskName, task):
+        return taskName
 
 
 class PaddedDecoratorPlugin(TextDecoratorPlugin):
@@ -42,14 +33,14 @@ class PaddedDecoratorPlugin(TextDecoratorPlugin):
         self.dateWidth = dateWidth
         self.taskWidth = taskWidth
 
-    def getTaskName(self, task):
-        return self.decorator.getTaskName(self.__getText__(str(task), self.taskWidth))
+    def getTaskName(self, taskName, task):
+        return self.decorator.getTaskName(self.__getText__(str(taskName), self.taskWidth), task)
 
-    def getDueDate(self, task):
-        return self.decorator.getTaskName(self.__getText__(str(task), self.dateWidth))
+    def getDueDate(self, taskName, task):
+        return self.decorator.getDueDate(self.__getText__(str(taskName), self.dateWidth), task)
 
-    def getTaskId(self, task):
-        return self.decorator.getTaskId(self.__getText__(str(task), self.taskIdWidth))
+    def getTaskId(self, taskName, task):
+        return self.decorator.getTaskId(self.__getText__(str(taskName), self.taskIdWidth), task)
 
     def __getText__(self, text, padding):
         return self.__pad__(text, padding)
@@ -63,72 +54,72 @@ class PaddedDecoratorPlugin(TextDecoratorPlugin):
 
 
 class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
+    todayTasks = "${color FFFFFF}${task}${color}"
+    tomorrowTasks = "${color 999999}${task}${color}"
+    laterTasks = "${color 999999}${task}${color}"
+
     def __init__(self, decorator):
         self.decorator = decorator
 
-    def getTaskName(self, task):
-        # task = "${color 9999FF}" + task + "${color}"
-        return self.decorator.getTaskName(task)
+    def getTaskName(self, taskName, task):
+        taskDate = task.date
+        today = datetime.datetime.now().date()
+        if (hasattr(taskDate, "time")):
+            taskDate = taskDate.date()
+        coloredTask = self.__get_colored_output__(taskName, taskDate, today)
 
-    def getDueDate(self, task):
-        # task.taskName = "${color 9999FF}" + task.date + "${color}"
-        return self.decorator.getTaskName(task)
+        return self.decorator.getTaskName(coloredTask, task)
 
-    def getTaskId(self, task):
-        # task = "${color 9999FF}" + task + "${color}"
-        return self.decorator.getTaskId(task)
+    def getDueDate(self, taskName, task):
+        coloredText = self.decorator.getDueDate(taskName, task)
+        taskDate = task.date
+        today = datetime.datetime.now().date()
+        if (hasattr(taskDate, "time")):
+            taskDate = taskDate.date()
+
+        coloredText = self.__get_colored_output__(coloredText, taskDate, today)
+
+        return coloredText
+
+    def getTaskId(self, taskName, task):
+
+
+        return self.decorator.getTaskId(taskName, task)
+
+    def __get_colored_output__(self, text, taskDate, today):
+        if (taskDate == today):
+            return self.todayTasks.replace("${task}", text)
+        elif (taskDate > today and taskDate < (today + datetime.timedelta(days=2))):
+            return self.tomorrowTasks.replace("${task}", text)
+        elif (taskDate >= (today + datetime.timedelta(days=2))):
+            return self.laterTasks.replace("${task}", text)
 
 
 class HumanizedDatesPlugin(TextDecoratorPlugin):
-    todayTasks="${color D6EBFF}${task}${color}"
-    tomorrowTasks="${color A8A8A8}${task}${color}"
-    laterTasks="${color A8A8A8}${task}${color}"
-
     def __init__(self, decorator):
         self.decorator = decorator
 
-    def getDueDate(self, task):
-        return self.decorator.getDueDate(self.__get_humanized_date__(task))
+    def getDueDate(self, taskName, task):
+        return self.decorator.getDueDate(self.__get_humanized_date__(taskName), task)
 
-    def getTaskName(self, task):
-        return self.decorator.getTaskName(task)
+    def getTaskName(self, taskName, task):
+        return self.decorator.getTaskName(taskName, task)
 
-    def getTodayTaskName(self, task):
-        return self.decorator.getTaskName(self.todayTasks.replace("${task}",task))
-
-    def getTomorrowTaskName(self, task):
-        return self.decorator.getTaskName(self.tomorrowTasks.replace("${task}",task))
-
-    def getLaterTaskName(self, task):
-        return self.decorator.getTaskName(self.laterTasks.replace("${task}",task))
-
-    def getTaskId(self, task):
-        return self.decorator.getTaskId(task)
+    def getTaskId(self, taskName, task):
+        return self.decorator.getTaskId(taskName, task)
 
     def __get_humanized_date__(self, date):
         now = datetime.datetime.now()
         if (get_floor_time(date) == get_floor_time(now)):
-            return "Today" + get_time_as_str(date)
+            return "Today " + get_time_as_str(date)
         elif (get_floor_time(date) == get_floor_time((now + datetime.timedelta(days=1)))):
-            return "Tomorrow" + get_time_as_str(date)
+            return "Tomorrow " + get_time_as_str(date)
         elif (get_floor_time(date) == get_floor_time(now + datetime.timedelta(days=2))):
-            return "Day after tomorrow"
+            return "Day after tomorrow "
         elif (get_floor_time(date) < get_floor_time(now)):
             return "Ovedue by " + str((now - get_floor_time(date)).days) + " Days"
         else:
             return "Later (" + str(date.day) + "/" + str(date.month) + ")"
-
-            # def get_floor_time(self, date):
-            #     if (hasattr(date,"time")):
-            #         return date.replace(hour=0,minute=0,second=0,microsecond=0)
-            #     else:
-            #         return datetime.datetime.combine(date,datetime.time(0,0,0,0))
-            #
-            # def get_time_as_str(self,date):
-            #     if (hasattr(date,"time")):
-            #         return " - " +str(date.time().hour) + ":" + str(date.time().minute)
-            #     else:
-            #         return ""
 
 
 def main():

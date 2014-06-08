@@ -1,10 +1,8 @@
 import copy
-from dateutil import get_floor_time, get_time_as_str, countDays
-
+from dateutil import get_floor_time, dateDiff
 __author__ = 'sajith'
 
 import datetime
-import shutil
 from os import listdir
 from os.path import isfile, join
 import hashlib
@@ -39,7 +37,10 @@ class Index:
         for filename in taskFiles:
             taskFile = file(baseDir + "/" + filename)
             lines = taskFile.readlines()
-            self.entries.append(Task(lines[0], filename))
+            rowData=lines[0]
+            if (len(lines) > 1):
+                rowData +=lines[1]
+            self.entries.append(Task(rowData, filename))
             taskFile.close()
 
     def listAll(self, status="PENDING"):
@@ -76,13 +77,36 @@ class Index:
             normalizedEntryDate = self.normalizeIfReccrentTask(entry, move_N_number_of_min_into_past)
 
             if normalizedEntryDate != None:
-                if normalizedEntryDate >= move_N_number_of_min_into_past and normalizedEntryDate <= overdueTime:
+                if normalizedEntryDate >= move_N_number_of_min_into_past and normalizedEntryDate <= overdueTime and self.__shoudl_notify__(entry):
                     entry.dueIn = (overdueTime - normalizedEntryDate).seconds / 60
                     overdueTasks.append(entry)
-                elif normalizedEntryDate > overdueTime and normalizedEntryDate <= soonStartTime:
+                elif normalizedEntryDate > overdueTime and normalizedEntryDate <= soonStartTime and self.__shoudl_notify__(entry):
                     entry.dueIn = (normalizedEntryDate - overdueTime).seconds / 60
                     startingSoonTasks.append(entry)
+                    # AbstractParser.parse(self, location)
         return (overdueTasks, startingSoonTasks)
+
+    def importTask(self, taskList):
+        for task in taskList:
+            taskStr = "|".join([part for part in task])
+            taskId = hashlib.sha1()
+            taskId.update(taskStr)
+            taskId.hexdigest()
+            if (not self.hasTask(taskId)):
+                self.addTask(task[0],datetime.datetime.strptime(task[1],"%Y-%m-%d %H:%M"),"NONE")
+
+
+    def hasTask(self, hash):
+        for task in self.entries:
+            if task.internalId == hash:
+                return True
+        return False
+
+    def normalizedWeeklyTaskStartingInPast(self, task):
+        if (task.reccrance == "WEEKLY" and task.date<datetime.datetime.today()):
+            return datetime.datetime.combine(datetime.datetime.today().date(), task.date.time())
+        else:
+            return task.date
 
     def normalizeIfReccrentTask(self, task, now):
         # if task.reccrance != None and task.date < now and self.isItToday(task.date, now, task.reccrance) == True:
@@ -91,15 +115,6 @@ class Index:
             return datetime.datetime.combine(now, taskTime)
         else:
             return task.date
-
-
-    # def normalizeIfReccrentTask(self, task, now):
-        # if task.reccrance != None and task.date < now:
-        #     daysDiff = now.weekday() - task.date.weekday()
-        #     taskTime = task.date.time()
-        #     return datetime.datetime.combine(now + datetime.timedelta(days=daysDiff), taskTime)
-        # else:
-        #     return task.date
 
     def isItToday(self, taskDate, today, rec):
         if rec == "DAILY":
@@ -116,13 +131,24 @@ class Index:
 
 
     def __shoudl_notify__(self, task):
-        pass
+        snoozed = task.get_property("SNOOZE")
+        lastSnoozed = task.get_property("LAST_SNOOZED")
+        if (snoozed is not None and lastSnoozed is not None):
+            lastSnoozedDate = datetime.datetime.strptime(lastSnoozed,"%Y-%m-%d %H:%M")
+            if (lastSnoozedDate + datetime.timedelta(minutes=int(snoozed)) < datetime.datetime.now()):
+                return True
+            else:
+                return False
+        return True
 
-    def snooze(self, taskId):
+    def snooze(self, taskId, time = 5):
         task = self.findTaskById(taskId)
-        task.snoozed = 1
+        task.set_property("SNOOZE",time)
+        task.set_property("LAST_SNOOZED",datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+        self.__update_task__(task)
 
-    def addTask(self, name, datetime=None, rec=None, notify=None):
+
+    def addTask(self, name, datetime=None, rec=None):
         taskStr = name
         if (datetime != None):
             taskStr += "|"
@@ -130,9 +156,6 @@ class Index:
         if (rec != None):
             taskStr += "|"
             taskStr += rec
-        if (notify != None):
-            taskStr += "|"
-            taskStr += notify
         taskStr += "|PENDING"
 
         task = Task(str(self.getNewTaskId()) + "|" + taskStr)
@@ -163,6 +186,7 @@ class Index:
         keyFile = file(self.indexDir + "/key", "w")
         keyFile.write(str(self.lastIndex))
         keyFile.flush()
+        # AbstractParser.parse(self, location)
         keyFile.close()
 
     def getNewTaskId(self):
@@ -179,7 +203,9 @@ class Index:
 
     def getTaskHash(self, task):
         taskId = hashlib.sha1()
-        taskId.update(task.toString())
+        taskWithoutId = "|".join([part for part in task.toString().split("|")[1:]])
+
+        taskId.update(taskWithoutId)
         return taskId.hexdigest()
 
     def updateTask(self, id, newData):
@@ -194,48 +220,56 @@ class Index:
         todaysAgenda = []
         upcoming = []
         for task in taskWithDate:
-            # date = self.normalizeIfReccrentTask(task, now)
-            daysBetweenTasks = countDays(now.weekday(),task.date.weekday())
-            if (get_floor_time(task.date) == get_floor_time(now)):
-                shallowCopyiedTask = copy.copy(task)
-                shallowCopyiedTask.date = task.date
-                todaysAgenda.append(shallowCopyiedTask)
-                if(task.reccrance == "DAILY"):
-                    shallowCopyiedTask = copy.copy(task)
-                    shallowCopyiedTask.date=now + datetime.timedelta(days=1)
-                    upcoming.append(shallowCopyiedTask)
+            # task.date = self.normalizedWeeklyTaskStartingInPast(task)
+            dd,weekDayDiff = dateDiff(now, task.date)
+            # daysBetweenTasks = countDays(now.weekday(), task.date.weekday())
 
-            elif (task.reccrance == "DAILY" and task.date < now) or (daysBetweenTasks == 0 and task.reccrance == "WEEKLY" and task.date < now):
-                    shallowCopyiedTask = copy.copy(task)
-                    shallowCopyiedTask.date=now
-                    todaysAgenda.append(shallowCopyiedTask)
-                    shallowCopyiedTask1 = copy.copy(task)
-                    shallowCopyiedTask1.date = now + datetime.timedelta(days=1)
-                    upcoming.append(shallowCopyiedTask1)
-            elif (daysBetweenTasks < 3 and task.date.weekday() > now.weekday()):
-                    shallowCopyiedTask = copy.copy(task)
-                    shallowCopyiedTask.date = now + datetime.timedelta(days=daysBetweenTasks)
-                    upcoming.append(shallowCopyiedTask)
-
-            # elif (get_floor_time(date) > get_floor_time(now) and get_floor_time(date) < get_floor_time(date + datetime.timedelta(days=3))):
-            #     task.date = date
-            #     upcoming.append(task)
-
-
+            if (task.reccrance == "DAILY" and task.date <= now):
+                copyOfTheTask = self.shallowCopyATask(task, now)
+                tomorrowsTask = self.shallowCopyATask(task, now + datetime.timedelta(days=1))
+                todaysAgenda.append(copyOfTheTask)
+                upcoming.append(tomorrowsTask)
+            elif (get_floor_time(task.date) == get_floor_time(now)):
+                todaysAgenda.append(task)
+            elif (task.reccrance == "WEEKLY" and task.date <= now and weekDayDiff == 0):
+                copyOfTheTask = self.shallowCopyATask(task, now)
+                todaysAgenda.append(copyOfTheTask)
+            elif (weekDayDiff <=3 and ( (task.reccrance != None and task.reccrance!="NONE") or task.date > now)):
+                # shallowCopyiedTask = self.shallowCopyATask(task, now + datetime.timedelta(days=daysBetweenTasks))
+                upcoming.append(task)
         return todaysAgenda, upcoming
+
+    def shallowCopyATask(self, task, dateToBeUpdated):
+        shallowCopiedTask = copy.copy(task)
+        if (hasattr(task.date, "time")):
+            dateToBeUpdated = datetime.datetime.combine(dateToBeUpdated, task.date.time())
+        else:
+            dateToBeUpdated = dateToBeUpdated.date()
+        shallowCopiedTask.date = dateToBeUpdated
+
+        return shallowCopiedTask
+
 
 class Task:
     taskName = ""
     date = None
     reccrance = None
-    notify = None
+    # notify = None
     status = None
     id = 0
     snoozed = 0
     dueIn = 0
     internalId = None
+    props = {}
+
+    def get_property(self, property):
+        return self.props.get(property)
+
+    def set_property(self, property, value):
+        self.props[property] = value
 
     def __init__(self, rowData, fileName=None):
+        self.props={}
         self.__internal_init__(rowData)
         self.internalId = fileName
 
@@ -243,8 +277,17 @@ class Task:
     def __internal_init__(self, rowData):
         if rowData == None:
             raise Exception("row data cannot be null")
-        rowData = rowData.rstrip('\n')
-        parts = rowData.split("|", 6)
+        taskRows = rowData.split("\n")
+        mainRow = taskRows[0]
+        if(len(taskRows) > 1):
+            subRow = taskRows[1]
+            props = subRow.split("|")
+            for prop in props:
+                keyValue = prop.split("=")
+                if (len(keyValue) > 1):
+                    self.props[keyValue[0]] = keyValue[1]
+
+        parts = mainRow.split("|", 6)
         self.id = int(parts[0])
         self.taskName = parts[1]
         partSize = len(parts)
@@ -254,17 +297,14 @@ class Task:
             self.hour = dateTime.time().hour
             self.min = dateTime.time().minute
             self.reccrance = parts[3]
-            self.notify = parts[4]
-            self.status = parts[5]
-            if (partSize > 6):
-                self.snoozed = int(parts[6])
+            self.status = parts[4]
         else:
             self.status = parts[2]
 
     def isOverdue(self):
         return self.date >= datetime.datetime.today() + datetime.timedelta(minutes=30)
 
-    def toString(self):
+    def get_main_part_as_string(self):
         taskStr = str(self.id) + "|" + self.taskName
         if (self.date != None):
             taskStr += "|"
@@ -272,9 +312,20 @@ class Task:
         if (self.reccrance != None):
             taskStr += "|"
             taskStr += self.reccrance
-        if (self.notify != None):
-            taskStr += "|"
-            taskStr += self.notify
+        # if (self.notify != None):
+        #     taskStr += "|"
+        #     taskStr += self.notify
         taskStr += "|"
         taskStr += self.status
         return taskStr
+
+    def toString(self):
+        mainPart = self.get_main_part_as_string()
+
+        if (len(self.props) >0):
+            mainPart +="\n"
+            for prop in self.props:
+                mainPart +=prop + "=" + str(self.props[prop])
+                mainPart += "|"
+
+        return mainPart

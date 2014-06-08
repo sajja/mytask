@@ -2,8 +2,10 @@ from index import Index
 from datetime import datetime
 from datetime import timedelta
 from time import sleep
+from parser import ParserFactory
 from print_plugin import TextDecoratorPlugin, PaddedDecoratorPlugin, ConkyColoredDecoratorPlugin, HumanizedDatesPlugin
 import pynotify
+import argparse
 
 __author__ = 'sajith'
 
@@ -48,7 +50,7 @@ class Todo:
             raise Exception("Too many params")
 
         #todo do this better
-        name = params[0].replace("\"","")
+        name = params[0].replace("\"", "")
         params = params[1:]
         if (len(params) > 0 ):
             date = self.parseDate(params[0])
@@ -64,8 +66,7 @@ class Todo:
         print("Task name: " + name)
         print("Dud daet: " + str(date))
         print("Reccurance: " + str(recurrence))
-        print("Notify: " + str(notify))
-        index.addTask(name, date, recurrence, notify)
+        index.addTask(name, date, recurrence)
 
 
     def parseDate(self, date):
@@ -76,7 +77,7 @@ class Todo:
             datePart = self.__getDate__(dateStrs[0])
             timePart = datetime.strptime(dateStrs[1], '%H:%M').time()
             return datetime.combine(datePart, timePart)
-        elif (len(dateStrs) == 1):  #single date, either tag or formated
+        elif (len(dateStrs) == 1):  #single date, either tag or formatted
             if (len(date.split(" ")) > 1):
                 #formated date with time
                 parsedDate = datetime.strptime(date, '%Y-%m-%d %H:%M')
@@ -129,7 +130,7 @@ class Todo:
         for overdueTask in tasksTobeNotified[0]:
             pynotify.init("markup")
             n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
-                                      "<b>Task Name</b> <i>" + overdueTask.taskName + "</i> <b>" + self.getDueTime(
+                                      "<b>Task Name</b> <i>" + overdueTask.taskName +" ("+str(overdueTask.id)+")</i> <b>" + self.getDueTime(
                                           overdueTask.dueIn, True) + "</b>",
                                       "/home/sajith/scratch/mytodo/Task-List-icon.png")
             n.show()
@@ -138,7 +139,7 @@ class Todo:
         for starting in tasksTobeNotified[1]:
             pynotify.init("markup")
             n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
-                                      "<b>Task Name</b> <i>" + starting.taskName + "</i> <b>" + self.getDueTime(
+                                      "<b>Task Name</b> <i>" + starting.taskName + " ("+str(starting.id)+")</i> <b>" + self.getDueTime(
                                           starting.dueIn, False) + "</b>",
                                       "/home/sajith/scratch/mytodo/Task-List-icon.png")
             n.show()
@@ -170,64 +171,86 @@ class Todo:
     def listTodos(self):
         taskWithDates, taskWithoutDates = index.listAll()
         textDeco = self.__getTextDecorator__("conky")
-        if (len(taskWithoutDates) > 0):
-            print("${color A8A8A8}")
-            # print("Task Id       Task Name")
-            # print("-------       --------- ${color}")
-            for task in taskWithoutDates:
-                print("("+textDeco.getTaskId(task.id)+")" + textDeco.getTaskName(task.taskName))
+
+        today = datetime.today().date()
+
+        todaysTasks = [task for task in taskWithDates if not hasattr(task.date, "time") or task.date.strftime('%H:%M') == "00:00"]
+
+
+        alltasks = todaysTasks + taskWithoutDates
+
+        if (len(alltasks) > 0):
+            # print("${color A8A8A8}")
+            for task in alltasks:
+                print(str(task.id) + " " + task.taskName)
+                # print("(" + textDeco.getTaskId(task.id, task) + ")" + textDeco.getTaskName(task.taskName, task))
         else:
             print("You got nothing todo")
-            print("    Perhaps you should find some work to do")
+            print("Perhaps you should find some work to do")
 
-    def agenda(self):
+    def agenda(self, pluginType):
+        # print(" \n")
         today, upcoming = index.agenda()
-        textDeco = self.__getTextDecorator__("conky")
+        textDeco = self.__getTextDecorator__(pluginType)
 
         for task in today:
-            taskTime = ""
-            if (hasattr(task.date, "time") and (task.date.time().hour != 0 or task.date.time().minute != 0)):
-                taskTime = "(" + str(task.date.time().hour) + ":" + str(task.date.time().minute) + ")"
-            print(textDeco.getTodayTaskName(task.taskName) + taskTime)
-            # print(
-            #     "${color D6EBFF}(" + str(task.id) + ") " + task.taskName + "            TODAY" + taskTime + " ${color}")
+            print(textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
         print("")
-        # for task in upcoming:
-        #     print(textDeco.getTaskId(task.id) + textDeco.getTaskName(task.taskName) + textDeco.getDueDate(task.date))
+        for task in upcoming:
+            print(textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
 
     def __getTextDecorator__(self, pluginType):
-        if (pluginType == None):
-            return TextDecoratorPlugin()
-        elif (pluginType == "conky"):
+        if (pluginType == "conky"):
             return HumanizedDatesPlugin(
-                PaddedDecoratorPlugin(14, 10, 40, ConkyColoredDecoratorPlugin(TextDecoratorPlugin())))
+                PaddedDecoratorPlugin(5, 10, 40, ConkyColoredDecoratorPlugin(TextDecoratorPlugin())))
+        else:
+            return TextDecoratorPlugin()
 
+    def importTasks(self, parserType="google", location="google"):
+        parser = ParserFactory().getParser(parserType)
+        stringTasks = parser.parse(file(location))
+        index.importTask(stringTasks)
+
+    def snooze(self, args):
+        snoozeTime = 15
+        if (len(args) == 2):
+            snoozeTime = int(args[1])
+
+        index.snooze(args[0], snoozeTime)
 
 def main():
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument("command", choices=["add","short","agenda","todo","complete","notify", "import", "snooze"])
+    parser.add_argument("command_args", nargs="*")
+    parser.add_argument("--type", help="increase output verbosity"  ,default="terminal")
+    args = parser.parse_args()
+
+    operation = args.command
+
     # for arg in sys.argv:
     #     print(arg)
-    if len(sys.argv) <= 1:
-        print("Usage: todo <listall>")
-        exit()
-    if (sys.argv[1] == "short"):
-        Todo().listShort()
-    elif (sys.argv[1] == "long"):
-        Todo().listDetails()
-    elif (sys.argv[1] == "delete"):
-        Todo().delete(int(sys.argv[2]))
-    elif (sys.argv[1] == "complete"):
-        Todo().complete(sys.argv[2])
-    elif (sys.argv[1] == "add"):
-        Todo().add(sys.argv[2:len(sys.argv)])
-    elif (sys.argv[1] == "notify"):
-        Todo().notifyAll()
-    elif (sys.argv[1] == "todo"):
-        Todo().listTodos()
-    elif (sys.argv[1] == "agenda"):
-        Todo().agenda()
-    else:
-        print("Unknown command")
 
+    if (operation == "short"):
+        Todo().listShort()
+    elif (operation == "long"):
+        Todo().listDetails()
+    elif (operation == "delete"):
+        Todo().delete(int(sys.argv[2]))
+    elif (operation == "complete"):
+        Todo().complete(sys.argv[2])
+    elif (operation == "add"):
+        Todo().add(sys.argv[2:len(sys.argv)])
+    elif (operation == "notify"):
+        Todo().notifyAll()
+    elif (operation == "todo"):
+        Todo().listTodos()
+    elif (operation == "agenda"):
+        Todo().agenda(args.type)
+    elif (operation == "import"):
+        Todo().importTasks("google", "/home/sajith/out")
+    elif (operation == "snooze"):
+        Todo().snooze(sys.argv[2:])
+    
 
 if __name__ == "__main__":
     main()
