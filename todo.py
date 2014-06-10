@@ -130,7 +130,8 @@ class Todo:
         for overdueTask in tasksTobeNotified[0]:
             pynotify.init("markup")
             n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
-                                      "<b>Task Name</b> <i>" + overdueTask.taskName +" ("+str(overdueTask.id)+")</i> <b>" + self.getDueTime(
+                                      "<b>Task Name</b> <i>" + overdueTask.taskName + " (" + str(
+                                          overdueTask.id) + ")</i> <b>" + self.getDueTime(
                                           overdueTask.dueIn, True) + "</b>",
                                       "/home/sajith/scratch/mytodo/Task-List-icon.png")
             n.show()
@@ -139,7 +140,8 @@ class Todo:
         for starting in tasksTobeNotified[1]:
             pynotify.init("markup")
             n = pynotify.Notification(" ************** TASK NOTIFICATION **************\n",
-                                      "<b>Task Name</b> <i>" + starting.taskName + " ("+str(starting.id)+")</i> <b>" + self.getDueTime(
+                                      "<b>Task Name</b> <i>" + starting.taskName + " (" + str(
+                                          starting.id) + ")</i> <b>" + self.getDueTime(
                                           starting.dueIn, False) + "</b>",
                                       "/home/sajith/scratch/mytodo/Task-List-icon.png")
             n.show()
@@ -174,8 +176,8 @@ class Todo:
 
         today = datetime.today().date()
 
-        todaysTasks = [task for task in taskWithDates if not hasattr(task.date, "time") or task.date.strftime('%H:%M') == "00:00"]
-
+        todaysTasks = [task for task in taskWithDates if
+                       not hasattr(task.date, "time") or task.date.strftime('%H:%M') == "00:00"]
 
         alltasks = todaysTasks + taskWithoutDates
 
@@ -186,7 +188,7 @@ class Todo:
                 # print("(" + textDeco.getTaskId(task.id, task) + ")" + textDeco.getTaskName(task.taskName, task))
         else:
             print("You got nothing todo")
-            print("Perhaps you should find some work to do")
+            print("Perhaps you should find some work or a new job ????")
 
     def agenda(self, pluginType):
         # print(" \n")
@@ -194,10 +196,11 @@ class Todo:
         textDeco = self.__getTextDecorator__(pluginType)
 
         for task in today:
-            print(textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+            print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
         print("")
         for task in upcoming:
-            print(textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+            print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(
+                textDeco.getDueDate(task.date, task)))
 
     def __getTextDecorator__(self, pluginType):
         if (pluginType == "conky"):
@@ -218,11 +221,15 @@ class Todo:
 
         index.snooze(args[0], snoozeTime)
 
+    def gc(self):
+        index.gc()
+
+
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument("command", choices=["add","short","agenda","todo","complete","notify", "import", "snooze"])
+    parser.add_argument("command", choices=["add", "short", "agenda", "todo", "complete", "notify", "import", "snooze", "gc"])
     parser.add_argument("command_args", nargs="*")
-    parser.add_argument("--type", help="increase output verbosity"  ,default="terminal")
+    parser.add_argument("--type", help="increase output verbosity", default="terminal")
     args = parser.parse_args()
 
     operation = args.command
@@ -247,10 +254,12 @@ def main():
     elif (operation == "agenda"):
         Todo().agenda(args.type)
     elif (operation == "import"):
-        Todo().importTasks("google", "/home/sajith/out")
+        Todo().importTasks("google", sys.argv[2])
     elif (operation == "snooze"):
         Todo().snooze(sys.argv[2:])
-    
+    elif (operation == "gc"):
+        Todo().gc()
+
 
 if __name__ == "__main__":
     main()

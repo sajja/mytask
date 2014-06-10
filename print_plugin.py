@@ -82,9 +82,13 @@ class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
         return coloredText
 
     def getTaskId(self, taskName, task):
-
-
-        return self.decorator.getTaskId(taskName, task)
+        # coloredText = ""
+        today = datetime.datetime.now().date()
+        taskDate = task.date
+        if (hasattr(taskDate, "time")):
+            taskDate = taskDate.date()
+        coloredText = self.__get_colored_output__(taskName, taskDate, today)
+        return self.decorator.getTaskId(coloredText , task)
 
     def __get_colored_output__(self, text, taskDate, today):
         if (taskDate == today):

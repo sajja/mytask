@@ -1,5 +1,7 @@
 import copy
 from dateutil import get_floor_time, dateDiff
+from mercurial import error, lock
+
 __author__ = 'sajith'
 
 import datetime
@@ -12,36 +14,6 @@ import os
 class Index:
     entries = []
     lastIndex = 0
-
-    def readLastIndex(self):
-        keyFile = file(self.indexDir + "/key", "a+")
-        data = keyFile.readline()
-        if (data != ""):
-            self.lastIndex = int(data)
-        keyFile.close()
-
-    def __init__(self, indexDir=None):
-        self.entries = []
-        if indexDir == None:
-            indexDir = "./.task"
-
-        self.indexDir = indexDir
-
-        taskFiles = [taskFile for taskFile in listdir(indexDir) if
-                     isfile(join(indexDir, taskFile)) and taskFile != "key"]
-
-        self.__createEntries__(indexDir, taskFiles)
-        self.readLastIndex()
-
-    def __createEntries__(self, baseDir, taskFiles):
-        for filename in taskFiles:
-            taskFile = file(baseDir + "/" + filename)
-            lines = taskFile.readlines()
-            rowData=lines[0]
-            if (len(lines) > 1):
-                rowData +=lines[1]
-            self.entries.append(Task(rowData, filename))
-            taskFile.close()
 
     def listAll(self, status="PENDING"):
         tasksWithSetDate = sorted(
@@ -77,10 +49,12 @@ class Index:
             normalizedEntryDate = self.normalizeIfReccrentTask(entry, move_N_number_of_min_into_past)
 
             if normalizedEntryDate != None:
-                if normalizedEntryDate >= move_N_number_of_min_into_past and normalizedEntryDate <= overdueTime and self.__shoudl_notify__(entry):
+                if normalizedEntryDate >= move_N_number_of_min_into_past and normalizedEntryDate <= overdueTime and self.__should_notify__(
+                        entry):
                     entry.dueIn = (overdueTime - normalizedEntryDate).seconds / 60
                     overdueTasks.append(entry)
-                elif normalizedEntryDate > overdueTime and normalizedEntryDate <= soonStartTime and self.__shoudl_notify__(entry):
+                elif normalizedEntryDate > overdueTime and normalizedEntryDate <= soonStartTime and self.__should_notify__(
+                        entry):
                     entry.dueIn = (normalizedEntryDate - overdueTime).seconds / 60
                     startingSoonTasks.append(entry)
                     # AbstractParser.parse(self, location)
@@ -89,12 +63,12 @@ class Index:
     def importTask(self, taskList):
         for task in taskList:
             taskStr = "|".join([part for part in task])
+            taskStr += "|NONE|PENDING"
             taskId = hashlib.sha1()
             taskId.update(taskStr)
-            taskId.hexdigest()
-            if (not self.hasTask(taskId)):
-                self.addTask(task[0],datetime.datetime.strptime(task[1],"%Y-%m-%d %H:%M"),"NONE")
-
+            id = taskId.hexdigest()
+            if (not self.hasTask(id)):
+                self.addTask(task[0], datetime.datetime.strptime(task[1], "%Y-%m-%d %H:%M"), "NONE")
 
     def hasTask(self, hash):
         for task in self.entries:
@@ -102,14 +76,7 @@ class Index:
                 return True
         return False
 
-    def normalizedWeeklyTaskStartingInPast(self, task):
-        if (task.reccrance == "WEEKLY" and task.date<datetime.datetime.today()):
-            return datetime.datetime.combine(datetime.datetime.today().date(), task.date.time())
-        else:
-            return task.date
-
     def normalizeIfReccrentTask(self, task, now):
-        # if task.reccrance != None and task.date < now and self.isItToday(task.date, now, task.reccrance) == True:
         if task.reccrance != None and task.date < now and self.isItToday(task.date, now, task.reccrance) == True:
             taskTime = task.date.time()
             return datetime.datetime.combine(now, taskTime)
@@ -129,24 +96,11 @@ class Index:
         else:
             raise Exception("Unsupported reccurence" + rec)
 
-
-    def __shoudl_notify__(self, task):
-        snoozed = task.get_property("SNOOZE")
-        lastSnoozed = task.get_property("LAST_SNOOZED")
-        if (snoozed is not None and lastSnoozed is not None):
-            lastSnoozedDate = datetime.datetime.strptime(lastSnoozed,"%Y-%m-%d %H:%M")
-            if (lastSnoozedDate + datetime.timedelta(minutes=int(snoozed)) < datetime.datetime.now()):
-                return True
-            else:
-                return False
-        return True
-
-    def snooze(self, taskId, time = 5):
+    def snooze(self, taskId, time=5):
         task = self.findTaskById(taskId)
-        task.set_property("SNOOZE",time)
-        task.set_property("LAST_SNOOZED",datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+        task.set_property("SNOOZE", time)
+        task.set_property("LAST_SNOOZED", datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
         self.__update_task__(task)
-
 
     def addTask(self, name, datetime=None, rec=None):
         taskStr = name
@@ -158,7 +112,7 @@ class Index:
             taskStr += rec
         taskStr += "|PENDING"
 
-        task = Task(str(self.getNewTaskId()) + "|" + taskStr)
+        task = Task(str(self.__getNewTaskId__()) + "|" + taskStr)
         self.entries.append(task)
         self.__write_to_fs__(task, self.getTaskHash(task))
         return task
@@ -182,6 +136,18 @@ class Index:
                 return task
         return None
 
+    def gc(self):
+        self.lastIndex = 0
+        self.__sync_last_task_id__()
+
+        for task in self.entries:
+            if (task.status == "DONE"):
+                self.deleteTask(task)
+
+        for task in self.entries:
+            task.id = self.__getNewTaskId__()
+            self.__write_to_fs__(task, task.internalId)
+
     def __sync_last_task_id__(self):
         keyFile = file(self.indexDir + "/key", "w")
         keyFile.write(str(self.lastIndex))
@@ -189,7 +155,7 @@ class Index:
         # AbstractParser.parse(self, location)
         keyFile.close()
 
-    def getNewTaskId(self):
+    def __getNewTaskId__(self):
         self.lastIndex += 1
         self.__sync_last_task_id__()
         return self.lastIndex
@@ -211,18 +177,13 @@ class Index:
     def updateTask(self, id, newData):
         pass
 
-    def __update_task__(self, task):
-        self.__write_to_fs__(task, task.internalId)
-
     def agenda(self):
         now = datetime.datetime.now()
         taskWithDate, taskWithoutDate = self.listAll()
         todaysAgenda = []
         upcoming = []
         for task in taskWithDate:
-            # task.date = self.normalizedWeeklyTaskStartingInPast(task)
-            dd,weekDayDiff = dateDiff(now, task.date)
-            # daysBetweenTasks = countDays(now.weekday(), task.date.weekday())
+            dd, weekDayDiff = dateDiff(now, task.date)
 
             if (task.reccrance == "DAILY" and task.date <= now):
                 copyOfTheTask = self.shallowCopyATask(task, now)
@@ -234,7 +195,7 @@ class Index:
             elif (task.reccrance == "WEEKLY" and task.date <= now and weekDayDiff == 0):
                 copyOfTheTask = self.shallowCopyATask(task, now)
                 todaysAgenda.append(copyOfTheTask)
-            elif (weekDayDiff <=3 and ( (task.reccrance != None and task.reccrance!="NONE") or task.date > now)):
+            elif (weekDayDiff <= 3 and ( (task.reccrance != None and task.reccrance != "NONE") or task.date > now)):
                 # shallowCopyiedTask = self.shallowCopyATask(task, now + datetime.timedelta(days=daysBetweenTasks))
                 upcoming.append(task)
         return todaysAgenda, upcoming
@@ -248,6 +209,51 @@ class Index:
         shallowCopiedTask.date = dateToBeUpdated
 
         return shallowCopiedTask
+
+    def __init__(self, indexDir=None):
+        self.entries = []
+        if indexDir == None:
+            indexDir = "./.task"
+
+        self.indexDir = indexDir
+
+        taskFiles = [taskFile for taskFile in listdir(indexDir) if
+                     isfile(join(indexDir, taskFile)) and taskFile != "key"]
+
+        self.__createEntries__(indexDir, taskFiles)
+        self.__readLastIndex__()
+
+
+    def __readLastIndex__(self):
+        keyFile = file(self.indexDir + "/key", "a+")
+        data = keyFile.readline()
+        if (data != ""):
+            self.lastIndex = int(data)
+        keyFile.close()
+
+    def __createEntries__(self, baseDir, taskFiles):
+        for filename in taskFiles:
+            taskFile = file(baseDir + "/" + filename)
+            lines = taskFile.readlines()
+            rowData = lines[0]
+            if (len(lines) > 1):
+                rowData += lines[1]
+            self.entries.append(Task(rowData, filename))
+            taskFile.close()
+
+    def __update_task__(self, task):
+        self.__write_to_fs__(task, task.internalId)
+
+    def __should_notify__(self, task):
+        snoozed = task.get_property("SNOOZE")
+        lastSnoozed = task.get_property("LAST_SNOOZED")
+        if (snoozed is not None and lastSnoozed is not None):
+            lastSnoozedDate = datetime.datetime.strptime(lastSnoozed, "%Y-%m-%d %H:%M")
+            if (lastSnoozedDate + datetime.timedelta(minutes=int(snoozed)) < datetime.datetime.now()):
+                return True
+            else:
+                return False
+        return True
 
 
 class Task:
@@ -269,7 +275,7 @@ class Task:
         self.props[property] = value
 
     def __init__(self, rowData, fileName=None):
-        self.props={}
+        self.props = {}
         self.__internal_init__(rowData)
         self.internalId = fileName
 
@@ -279,7 +285,7 @@ class Task:
             raise Exception("row data cannot be null")
         taskRows = rowData.split("\n")
         mainRow = taskRows[0]
-        if(len(taskRows) > 1):
+        if (len(taskRows) > 1):
             subRow = taskRows[1]
             props = subRow.split("|")
             for prop in props:
@@ -322,10 +328,10 @@ class Task:
     def toString(self):
         mainPart = self.get_main_part_as_string()
 
-        if (len(self.props) >0):
-            mainPart +="\n"
+        if (len(self.props) > 0):
+            mainPart += "\n"
             for prop in self.props:
-                mainPart +=prop + "=" + str(self.props[prop])
+                mainPart += prop + "=" + str(self.props[prop])
                 mainPart += "|"
 
         return mainPart
