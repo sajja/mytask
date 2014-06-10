@@ -1,0 +1,3 @@
+#!/bin/bash
+cd ~
+python /home/sajith/scratch/mytask/todo.py  "$@"
