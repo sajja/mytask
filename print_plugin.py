@@ -63,7 +63,7 @@ class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
 
     def getTaskName(self, taskName, task):
         taskDate = task.date
-        today = datetime.datetime.now().date()
+        today = datetime.datetime.now()
         if (hasattr(taskDate, "time")):
             taskDate = taskDate.date()
         coloredTask = self.__get_colored_output__(taskName, taskDate, today)
@@ -73,7 +73,7 @@ class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
     def getDueDate(self, taskName, task):
         coloredText = self.decorator.getDueDate(taskName, task)
         taskDate = task.date
-        today = datetime.datetime.now().date()
+        today = datetime.datetime.now()
         if (hasattr(taskDate, "time")):
             taskDate = taskDate.date()
 
@@ -83,19 +83,20 @@ class ConkyColoredDecoratorPlugin(TextDecoratorPlugin):
 
     def getTaskId(self, taskName, task):
         # coloredText = ""
-        today = datetime.datetime.now().date()
+        today = datetime.datetime.now()
         taskDate = task.date
         if (hasattr(taskDate, "time")):
             taskDate = taskDate.date()
         coloredText = self.__get_colored_output__(taskName, taskDate, today)
-        return self.decorator.getTaskId(coloredText , task)
+        return self.decorator.getTaskId(coloredText, task)
 
     def __get_colored_output__(self, text, taskDate, today):
-        if (taskDate == today):
+        todayDate = today.date()
+        if (taskDate == todayDate):
             return self.todayTasks.replace("${task}", text)
-        elif (taskDate > today and taskDate < (today + datetime.timedelta(days=2))):
+        elif (taskDate > todayDate and taskDate < (todayDate + datetime.timedelta(days=2))):
             return self.tomorrowTasks.replace("${task}", text)
-        elif (taskDate >= (today + datetime.timedelta(days=2))):
+        elif (taskDate >= (todayDate + datetime.timedelta(days=2))):
             return self.laterTasks.replace("${task}", text)
 
 
@@ -124,6 +125,23 @@ class HumanizedDatesPlugin(TextDecoratorPlugin):
             return "Ovedue by " + str((now - get_floor_time(date)).days) + " Days"
         else:
             return "Later (" + str(date.day) + "/" + str(date.month) + ")"
+
+
+class TrimLongNamesPlugin(TextDecoratorPlugin):
+    def __init__(self, decorator):
+        self.decorator = decorator
+
+    def getDueDate(self, taskName, task):
+        return self.decorator.getDueDate(taskName, task)
+
+    def getTaskName(self, taskName, task):
+        if (len(taskName) > 35):
+            taskName = taskName[0:33]
+            taskName += ".."
+        return self.decorator.getTaskName(taskName, task)
+
+    def getTaskId(self, taskName, task):
+        return self.decorator.getTaskId(taskName, task)
 
 
 def main():

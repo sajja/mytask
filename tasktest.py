@@ -231,6 +231,31 @@ class MyTest(unittest.TestCase):
         self.assertEqual(len(taskStartsIn15Min[0]), 0)
         self.assertEqual(len(taskStartsIn15Min[1]), 3)
 
+    def test_completed_tasks_should_not_be_notified(self):
+        today = datetime.datetime.today()
+        today_10_min_future = today + datetime.timedelta(minutes=10)
+        today_15_min_future = today + datetime.timedelta(minutes=15)
+        today_20_min_future = today + datetime.timedelta(minutes=20)
+        today_30_min_future = today + datetime.timedelta(minutes=30)
+        today_1_hour_future = today + datetime.timedelta(hours=1)
+
+        self.addTask(6, "task statring in 10 min", "PENDING", today_10_min_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        self.addTask(7, "task statring in 15 min", "PENDING", today_15_min_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        self.addTask(8, "task statring in 20 min", "PENDING", today_20_min_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        self.addTask(9, "task statring in 30 min", "PENDING", today_30_min_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        self.addTask(10, "task statring in one hour", "PENDING", today_1_hour_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        self.addTask(11, "task statring in 10 min but snoozed", "PENDING",
+                     today_10_min_future.strftime('%Y-%m-%d %H:%M'), "NONE")
+        todayTasks = self.index.listTodayTasks()
+        self.assertEqual(len(todayTasks), 7)
+        overdueTasks, pendingTasks = self.index.listNotificationsPendingTasks(15)
+        self.assertEqual(len(overdueTasks), 0)
+        self.assertEqual(len(pendingTasks), 3)
+
+        self.index.markTaskComplete(pendingTasks[0].id)
+        overdueTasks, pendingTasks = self.index.listNotificationsPendingTasks(15)
+        self.assertEqual(len(pendingTasks), 2)
+
 
     def test_snooze(self):
         tasks = self.index.listTodayTasks()

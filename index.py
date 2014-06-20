@@ -38,7 +38,7 @@ class Index:
         #tasks to be soon started.
         soonStartTime = overdueTime + datetime.timedelta(minutes=future)
 
-        taskWithDate, taskWithoutDate = self.listAll(status=None)
+        taskWithDate, taskWithoutDate = self.listAll()
         allPendingTasks = taskWithDate + taskWithoutDate
 
         overdueTasks = []

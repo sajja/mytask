@@ -3,7 +3,8 @@ from datetime import datetime
 from datetime import timedelta
 from time import sleep
 from parser import ParserFactory
-from print_plugin import TextDecoratorPlugin, PaddedDecoratorPlugin, ConkyColoredDecoratorPlugin, HumanizedDatesPlugin
+from print_plugin import TextDecoratorPlugin, PaddedDecoratorPlugin, ConkyColoredDecoratorPlugin, HumanizedDatesPlugin, \
+    TrimLongNamesPlugin
 import pynotify
 import argparse
 
@@ -195,17 +196,27 @@ class Todo:
         today, upcoming = index.agenda()
         textDeco = self.__getTextDecorator__(pluginType)
 
-        for task in today:
-            print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+        if (len(today) == 0):
+            print "${font Inconsolata:italic:size=12}Nothing scheduled for today${font}"
+            print("")
+        else:
+            for task in today:
+                print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+            print "${font}"
         print("")
+
+        if(pluginType == "conky"):
+            print "${font Inconsolata:size=12}"
         for task in upcoming:
-            print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(
-                textDeco.getDueDate(task.date, task)))
+            print(str(textDeco.getTaskId(task.id, task)) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+
+        if(pluginType == "conky"):
+            print "${font}"
+
 
     def __getTextDecorator__(self, pluginType):
         if (pluginType == "conky"):
-            return HumanizedDatesPlugin(
-                PaddedDecoratorPlugin(5, 10, 40, ConkyColoredDecoratorPlugin(TextDecoratorPlugin())))
+            return HumanizedDatesPlugin(TrimLongNamesPlugin(PaddedDecoratorPlugin(5, 10, 40, ConkyColoredDecoratorPlugin(TextDecoratorPlugin()))))
         else:
             return TextDecoratorPlugin()
 
