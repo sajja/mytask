@@ -119,10 +119,10 @@ class HumanizedDatesPlugin(TextDecoratorPlugin):
             return "Today " + get_time_as_str(date)
         elif (get_floor_time(date) == get_floor_time((now + datetime.timedelta(days=1)))):
             return "Tomorrow " + get_time_as_str(date)
-        elif (get_floor_time(date) == get_floor_time(now + datetime.timedelta(days=2))):
-            return "Day after tomorrow "
-        elif (get_floor_time(date) < get_floor_time(now)):
-            return "Ovedue by " + str((now - get_floor_time(date)).days) + " Days"
+        # elif (get_floor_time(date) == get_floor_time(now + datetime.timedelta(days=2))):
+        #     return "Day after tomorrow "
+        # elif (get_floor_time(date) < get_floor_time(now)):
+        #     return "Overdue by " + str((now - get_floor_time(date)).days) + " Days"
         else:
             return "Later (" + str(date.day) + "/" + str(date.month) + ")"
 
