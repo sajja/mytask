@@ -201,7 +201,7 @@ class Todo:
             print("")
         else:
             for task in today:
-                print(textDeco.getTaskId(task.id, task) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
+                print(str(textDeco.getTaskId(task.id, task)) + textDeco.getTaskName(task.taskName, task) + str(textDeco.getDueDate(task.date, task)))
             print "${font}"
         print("")
 
