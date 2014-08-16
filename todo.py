@@ -238,7 +238,7 @@ class Todo:
 
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument("command", choices=["add", "short", "agenda", "todo", "complete", "notify", "import", "snooze", "gc"])
+    parser.add_argument("command", choices=["add", "short", "agenda", "todo", "done", "notify", "import", "snooze", "gc"])
     parser.add_argument("command_args", nargs="*")
     parser.add_argument("--type", help="increase output verbosity", default="terminal")
     args = parser.parse_args()
@@ -254,7 +254,7 @@ def main():
         Todo().listDetails()
     elif (operation == "delete"):
         Todo().delete(int(sys.argv[2]))
-    elif (operation == "complete"):
+    elif (operation == "done"):
         Todo().complete(sys.argv[2])
     elif (operation == "add"):
         Todo().add(sys.argv[2:len(sys.argv)])

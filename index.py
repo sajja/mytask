@@ -1,6 +1,5 @@
 import copy
 from dateutil import get_floor_time, dateDiff
-from mercurial import error, lock
 
 __author__ = 'sajith'
 
@@ -31,9 +30,9 @@ class Index:
         return todayTasks
 
     def listNotificationsPendingTasks(self, future=10):
-        #we go back "future" number of min
+        # we go back "future" number of min
         move_N_number_of_min_into_past = datetime.datetime.now() + datetime.timedelta(minutes=-future)
-        #unitl this its overdue tasks
+        # unitl this its overdue tasks
         overdueTime = move_N_number_of_min_into_past + datetime.timedelta(minutes=future)
         #tasks to be soon started.
         soonStartTime = overdueTime + datetime.timedelta(minutes=future)
@@ -102,17 +101,19 @@ class Index:
         task.set_property("LAST_SNOOZED", datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
         self.__update_task__(task)
 
-    def addTask(self, name, datetime=None, rec=None):
+    def addTask(self, name, taskDate=None, rec=None):
+        now = datetime.datetime.now()
         taskStr = name
-        if (datetime != None):
+        if (taskDate != None):
             taskStr += "|"
-            taskStr += datetime.strftime('%Y-%m-%d %H:%M')
+            taskStr += taskDate.strftime('%Y-%m-%d %H:%M')
         if (rec != None):
             taskStr += "|"
             taskStr += rec
         taskStr += "|PENDING"
 
         task = Task(str(self.__getNewTaskId__()) + "|" + taskStr)
+        task.set_property("CREATED", now.strftime('%Y-%m-%d %H:%M'))
         self.entries.append(task)
         self.__write_to_fs__(task, self.getTaskHash(task))
         return task
@@ -139,9 +140,19 @@ class Index:
     def gc(self):
         self.lastIndex = 0
         self.__sync_last_task_id__()
+        more_than_one_month_ago = datetime.datetime.today() + datetime.timedelta(days=-31)
 
         for task in self.entries:
+            created = task.get_property("CREATED")
+            createdDate = None
+            if (created != None):
+                createdDate = datetime.datetime.strptime(created, "%Y-%m-%d %H:%M")
+
             if (task.status == "DONE"):
+                self.deleteTask(task)
+            elif createdDate != None and createdDate < more_than_one_month_ago:
+                self.deleteTask(task)
+            elif task.date != None and task.date < more_than_one_month_ago:
                 self.deleteTask(task)
 
         for task in self.entries:
@@ -319,8 +330,8 @@ class Task:
             taskStr += "|"
             taskStr += self.reccrance
         # if (self.notify != None):
-        #     taskStr += "|"
-        #     taskStr += self.notify
+        # taskStr += "|"
+        # taskStr += self.notify
         taskStr += "|"
         taskStr += self.status
         return taskStr

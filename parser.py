@@ -14,7 +14,7 @@ class GoogleCalendarParser(AbstractParser):
         taskBaseDate = None
         tasks = []
         for row in data:
-            dateMatch = re.search('(Sun|Mon|Tue|Wed|Thu|Fri|Sat) (Jan|Feb|Mar|April|May|Jun|July|Aug|Sept|Oct|Nov|Dec) (\d+)',row)
+            dateMatch = re.search('(Sun|Mon|Tue|Wed|Thu|Fri|Sat) (Jan|Feb|Mar|April|May|Jun|Jul|Aug|Sept|Oct|Nov|Dec) (\d+)',row)
             if (dateMatch is not None):
                 dateStr = dateMatch.group(0)
                 row = row[len(dateStr):]

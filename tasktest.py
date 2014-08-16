@@ -83,6 +83,21 @@ class MyTest(unittest.TestCase):
                         'NONE')
         self.assertTask(taskWithDate, "Today task1", "PENDING", today.date(), 'NONE', True)
 
+    def test_gc(self):
+        today = datetime.datetime.today()
+        more_than_one_month_ago = today + datetime.timedelta(days=-31)
+        self.addTask(666, "yesterday task which starts in 5 min", "DONE",
+                     more_than_one_month_ago.strftime('%Y-%m-%d %H:%M'), "DAILY")
+
+
+        taskWithDate, taskWithoutDate = self.index.listAll(status=None)
+        self.assertEqual(len(taskWithoutDate), 2)
+        self.assertEqual(len(taskWithDate), 3)
+        self.index.gc()
+        taskWithDate, taskWithoutDate = self.index.listAll(status=None)
+        self.assertEqual(len(taskWithoutDate), 1)
+        self.assertEqual(len(taskWithDate), 1)
+
 
     def test_todays_tasks(self):
         today = datetime.datetime.today().date()
