@@ -1,3 +1,5 @@
+from parser import GoogleCalendarParser
+
 __author__ = 'sajith'
 from index import Index, Task
 import unittest
@@ -49,6 +51,28 @@ class MyTest(unittest.TestCase):
         tasksWithSetDateNew, taskWithoutDateNew = self.index.listAll()
         self.assertEqual(len(taskWithoutDate), len(taskWithoutDateNew))
         self.assertEqual(len(tasksWithSetDate) + 2, len(tasksWithSetDateNew))
+
+    def test_import_same_file_twice_should_not_create_new_tasks(self):
+
+        tasksWithSetDate, taskWithoutDate = self.index.listAll()
+
+        self.assertEqual(len(tasksWithSetDate),2)
+        self.assertEqual(len(taskWithoutDate),1)
+
+        self.googleTaskFile = file("./googleagenda")
+        self.googleParser = GoogleCalendarParser()
+        tasks = self.googleParser.parse(self.googleTaskFile)
+        self.assertEqual(len(tasks),12)
+
+        importedCount = self.index.importTask(tasks)
+        self.assertEqual(importedCount,12)
+        tasksWithSetDateNew, taskWithoutDateNew = self.index.listAll()
+        self.assertEqual(len(taskWithoutDateNew),1)
+        self.assertEqual(len(tasksWithSetDateNew),14)
+
+        importedCount = self.index.importTask(tasks)
+        self.assertEqual(importedCount,0)
+
 
 
     def test_list_all_pending(self):

@@ -31,7 +31,6 @@ class GoogleCalendarParser(AbstractParser):
                 taskStr = taskStr.lstrip().rstrip()
 
                 taskDate = datetime.strptime(taskBaseDate.strftime("%Y %b %d")+" " + timeStr, "%Y %b %d %I:%M%p")
-                print(taskBaseDate.strftime("%Y %b %d")+" " + timeStr)
                 tasks.append([taskStr,taskDate.strftime('%Y-%m-%d %H:%M')])
         return tasks
 

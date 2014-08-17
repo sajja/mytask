@@ -60,6 +60,7 @@ class Index:
         return (overdueTasks, startingSoonTasks)
 
     def importTask(self, taskList):
+        imported_tasks = 0
         for task in taskList:
             taskStr = "|".join([part for part in task])
             taskStr += "|NONE|PENDING"
@@ -68,6 +69,9 @@ class Index:
             id = taskId.hexdigest()
             if (not self.hasTask(id)):
                 self.addTask(task[0], datetime.datetime.strptime(task[1], "%Y-%m-%d %H:%M"), "NONE")
+                imported_tasks += 1
+        print( str(imported_tasks) + " tasks were successfully imported")
+        return imported_tasks
 
     def hasTask(self, hash):
         for task in self.entries:
@@ -180,7 +184,8 @@ class Index:
 
     def getTaskHash(self, task):
         taskId = hashlib.sha1()
-        taskWithoutId = "|".join([part for part in task.toString().split("|")[1:]])
+        task_stripped_with_additional_props = task.toString().split("\n")[0:1][0]
+        taskWithoutId = "|".join([part for part in task_stripped_with_additional_props.split("|")[1:]])
 
         taskId.update(taskWithoutId)
         return taskId.hexdigest()

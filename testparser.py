@@ -13,6 +13,5 @@ class MyTest(TestCase):
     def testParse(self):
         x = "12|3343|2342"
         v = x.split("|")[1:]
-        z = "|".join([vv for vv in v])
         tasks = self.googleParser.parse(self.googleTaskFile)
         self.assertEqual(len(tasks),12)
